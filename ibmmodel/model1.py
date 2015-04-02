@@ -6,6 +6,8 @@ import decimal
 from decimal import Decimal as D
 import time
 import cPickle
+import numpy as np
+from sklearn.metrics import mean_squared_error
 
 # set decimal context
 decimal.getcontext().prec = 4
@@ -61,6 +63,7 @@ class IBMModel1:
         :return:
         """
 
+        eps = 1E-7
         unit = len(corpus) / 100
 
         st = time.time()
@@ -82,6 +85,9 @@ class IBMModel1:
         # loop
         for i in range(loop_count):
             print '===== %s =====' % str(i + 1)
+
+            if i > 0:
+                _t = [_ for _ in t.values()]
 
             st = time.time()
             count = collections.defaultdict(D)
@@ -113,6 +119,12 @@ class IBMModel1:
                 print "Iteration %s: %.2fs" % (str(i + 1), (time.time() - st))
                 _pprint(t)
 
+            if i > 0:
+                __t = [_ for _ in t.values()]
+                converge = mean_squared_error(np.array(_t), np.array(__t))
+
+                if converge < eps:
+                    break
         return t
 
 
@@ -123,7 +135,7 @@ if __name__ == '__main__':
     ibm = IBMModel1()
 
     sentences = []
-    MAX_LINES = 1000
+    MAX_LINES = 10
 
     s = time.time()
     with open(source) as file1, open(target) as file2:
@@ -138,6 +150,6 @@ if __name__ == '__main__':
     print "Time spent to read data: %.2fs" % (time.time() - s)
 
     t = ibm.train(corpus, loop_count=50, verbose=True)
-    _pprint(t)
+    # _pprint(t)
 
-    cPickle.dump(t, open('trained_t_', 'w'))
+    cPickle.dump([_ for _ in sorted(t.items(), key=itemgetter(1), reverse=True)], open('trained_t.p', 'w'))
