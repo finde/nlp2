@@ -124,10 +124,10 @@ if __name__ == '__main__':
             source_sentences.append(_f.rstrip('\n').split(' '))
             target_sentences.append(_e.rstrip('\n').split(' '))
 
-            if max_lines:
-                if len(source_sentences) % (max_lines / 100) == 0:
-                    print "Reading: %s%%" % (len(source_sentences) * 100 / max_lines)
+            if len(source_sentences) % 1000 == 0:
+                print "Read: %s lines" % (len(source_sentences))
 
+            if max_lines:
                 if len(source_sentences) == max_lines:
                     break
 
