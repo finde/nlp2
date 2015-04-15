@@ -1,24 +1,9 @@
 from __future__ import division
 from operator import itemgetter
 import collections
-import helpers as utils
-import decimal
-from decimal import Decimal as D
-import time
 import cPickle
+import operator
 import numpy as np
-from sklearn.metrics import mean_squared_error
-
-# set decimal context
-decimal.getcontext().prec = 4
-decimal.getcontext().rounding = decimal.ROUND_HALF_UP
-
-
-def _constant_factory(value):
-    """
-    define a local function for uniform probability initialization
-    """
-    return lambda: value
 
 
 def _pprint(tbl):
@@ -32,124 +17,124 @@ def _pprint(tbl):
 
 
 class IBMModel1:
-    def __init__(self):
+    def __init__(self, source_corpus, target_corpus):
+        self.t = collections.defaultdict()
+        self.q = collections.defaultdict()
+
+        self.source_corpus = source_corpus
+        self.target_corpus = target_corpus
+        self.f_word = list(set(reduce(operator.add, source_corpus)))
+        self.e_word = list(set(reduce(operator.add, target_corpus)))
         pass
 
-    @staticmethod
-    def train(corpus, loop_count=1000, verbose=True):
-        """
-         Pseudocode of EM for IBM Model 1 from Phillip Koehn's book
+    def save_translation_table(self, filename='model1.p'):
+        print self.get_argmax_t()
+        cPickle.dump(self.get_argmax_t(), open(filename, 'w'))
 
-         initialize t(e|f) uniformly
-         do until convergence
-           set count(e|f) to 0 for all e,f
-           set total(f) to 0 for all f
-           for all sentence pairs (e_s,f_s)
-             set total_s(e) = 0 for all e
-             for all words e in e_s
-               for all words f in f_s
-                 total_s(e) += t(e|f)
-             for all words e in e_s
-               for all words f in f_s
-                 count(e|f) += t(e|f) / total_s(e)
-                 total(f)   += t(e|f) / total_s(e)
-           for all f
-             for all e
-               t(e|f) = count(e|f) / total(f)
+    def load_translation_table(self, filename='model1.p'):
+        return cPickle.load(self.get_argmax_t(), open(filename, 'r'))
 
-        :param corpus:
-        :param loop_count:
-        :param verbose:
-        :return:
-        """
+    def get_viterbi(self, source_sentence, target_sentence):
 
-        eps = 1E-7
-        unit = len(corpus) / 100
+        pass
 
-        st = time.time()
-        print "Reading keys ..."
-        f_keys = set()
-        for x, (es, fs) in enumerate(corpus):
-            for f in fs:
-                f_keys.add(f)
+    def train(self, max_iter=5):
+        f_word = self.f_word
+        e_word = self.e_word
+        t = self.t
+        # q = self.q
+        old_ll = 0
+        eps = 1E-2
 
-            if verbose and x % unit == 0:
-                print '\t%d of %d' % (x, len(corpus))
+        for k in range(max_iter):
+            C = {}
+            for m, l in zip(self.source_corpus, self.target_corpus):
+                l = ['NULL'] + l
+                if k == 0:
+                    for fi in m:
+                        for ej in l:
+                            if "%s|%s" % (fi, ej) not in t:
+                                t["%s|%s" % (fi, ej)] = 1.0 / len(e_word)
 
-        # todo:: make this faster by using counter ?
+                for i, fi in enumerate(m):
+                    sum_t = sum([t["%s|%s" % (fi, ej)] for ej in l]) * 1.0
+                    for j, ej in enumerate(l):
+                        delta = t["%s|%s" % (fi, ej)] / sum_t
 
-        # default value provided as uniform probability)
-        t = collections.defaultdict(_constant_factory(D(1 / len(f_keys))))
-        print "... done in: %.2fs" % (time.time() - st)
+                        C["%s %s" % (ej, fi)] = C.get("%s %s" % (ej, fi), 0) + delta
+                        C["%s" % (ej)] = C.get("%s" % (ej), 0) + delta
 
-        # loop
-        for i in range(loop_count):
-            print '===== %s =====' % str(i + 1)
+                        # C["%s|%s %s %s" % (j, i, len(m), len(l))] = C.get("%s|%s %s %s" % (j, i, len(m), len(l)), 0) + delta
+                        # C["%s %s %s" % (j, len(m), len(l))] = C.get("%s %s %s" % (j, len(m), len(l)), 0) + delta
 
-            if i > 0:
-                _t = [_ for _ in t.values()]
+            # set t
+            for f in f_word:
+                for e in e_word:
+                    if "%s %s" % (e, f) in C and "%s" % (e) in C:
+                        t["%s|%s" % (f, e)] = C["%s %s" % (e, f)] / C["%s" % (e)]
 
-            st = time.time()
-            count = collections.defaultdict(D)
-            total = collections.defaultdict(D)
-            total_s = collections.defaultdict(D)
-            for x, (es, fs) in enumerate(corpus):
+            ll = 0
+            for m, l in zip(self.source_corpus, self.target_corpus):
+                l = ['NULL'] + l
+                for i, fi in enumerate(m):
+                    _t_ef = 0
 
-                # added null
-                # es = [''] + es
+                    for j, ej in enumerate(l):
+                        # num = C.get("%s|%s %s %s" % (j, i, len(m), len(l)), 0)
+                        # denum = C.get("%s %s %s" % (j, len(m), len(l)), 0)
+                        # q["%s|%s %s %s" % (j, i, len(m), len(l))] = num / denum
 
-                # compute normalization
-                for e in es:
-                    total_s[e] = D()
-                    for f in fs:
-                        total_s[e] += t[(e, f)]
-                for e in es:
-                    for f in fs:
-                        count[(e, f)] += t[(e, f)] / total_s[e]
-                        total[f] += t[(e, f)] / total_s[e]
+                        # likelihood
+                        _t_ef += t["%s|%s" % (fi, ej)]
 
-                if verbose and (x % unit == 0):
-                    print '\t%d of %d' % (x, len(corpus))
+                    ll += np.log(_t_ef)
 
-            # estimate probability
-            for (e, f) in count.keys():
-                t[(e, f)] = count[(e, f)] / total[f]
+                ll -= len(l) * np.log(len(m))
 
-            if verbose:
-                print "Iteration %s: %.2fs" % (str(i + 1), (time.time() - st))
-                _pprint(t)
+            print "---em iteration:%s---: %s" % (k + 1, ll)
 
-            if i > 0:
-                __t = [_ for _ in t.values()]
-                converge = mean_squared_error(np.array(_t), np.array(__t))
+            with open('ll_ibm_model_1.txt', 'ab') as f:
+                f.write(str(ll) + '\n')
+                f.close()
 
-                if converge < eps:
-                    break
-        return t
+            if abs(old_ll - ll) < eps:
+                break
+
+            old_ll = ll
+
+        self.t = t
+        # self.q = q
+
+        with open('t_ibm_model_1', 'w') as f:
+            cPickle.dump({'t': self.t, 'it': k, 'll': ll}, f)
+            f.close()
 
 
 if __name__ == '__main__':
+    source = '../data/hansards.36.2.e'
+    target = '../data/hansards.36.2.f'
+    # source = '../data/corpus_1000.nl'
+    # target = '../data/corpus_1000.en'
 
-    source = '../data/hansards.e'
-    target = '../data/hansards.f'
-    ibm = IBMModel1()
+    source_sentences = []
+    target_sentences = []
+    max_lines = None
+    with open(source) as file_f, open(target) as file_e:
+        for _f, _e in zip(file_f, file_e):
+            source_sentences.append(_f.rstrip('\n').split(' '))
+            target_sentences.append(_e.rstrip('\n').split(' '))
 
-    sentences = []
-    MAX_LINES = 10
+            if max_lines:
+                if len(source_sentences) % (max_lines / 100) == 0:
+                    print "Reading: %s%%" % (len(source_sentences) * 100 / max_lines)
 
-    s = time.time()
-    with open(source) as file1, open(target) as file2:
-        for source_sentences, target_sentences in zip(file1, file2):
-            sentences.append([source_sentences, target_sentences])
+                if len(source_sentences) == max_lines:
+                    break
 
-            if MAX_LINES and len(sentences) == MAX_LINES:
-                break
+    with open('ll_ibm_model_1.txt', 'w') as f:
+        f.close()
 
-    corpus = utils.mkcorpus(sentences)
-    print "Number of sentences: %d" % len(sentences)
-    print "Time spent to read data: %.2fs" % (time.time() - s)
-
-    t = ibm.train(corpus, loop_count=50, verbose=True)
-    # _pprint(t)
-
-    cPickle.dump([_ for _ in sorted(t.items(), key=itemgetter(1), reverse=True)], open('trained_t.p', 'w'))
+    ibm = IBMModel1(source_corpus=source_sentences, target_corpus=target_sentences)
+    ibm.train(max_iter=10000)
+    # T = ibm.get_viterbi()
+    # print T
