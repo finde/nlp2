@@ -54,9 +54,9 @@ class IBMModel1(IBMModel):
             # print k, i, j
             if j != 0:
                 if probs[j] > .75:
-                    sure.append(" ".join(['%04d' % (k + 1), str(i + 1), str(j), 'S']))
+                    sure.append(" ".join(['%04d' % (k + 1), str(i + 1), str(j)]))
                 else:
-                    proba.append(" ".join(['%04d' % (k + 1), str(i + 1), str(j), 'P']))
+                    proba.append(" ".join(['%04d' % (k + 1), str(i + 1), str(j)]))
 
         return sure, proba
 
