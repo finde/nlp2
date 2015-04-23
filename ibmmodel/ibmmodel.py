@@ -68,8 +68,10 @@ class IBMModel(object):
     Abstract class for IBM Models.
     """
 
-    @staticmethod
-    def get_sent_loglikelihood(e_sent, f_sent):
+    def get_sent_loglikelihood(self, e_sent, f_sent):
+        pass
+
+    def get_sent_alignment(self, e_sent, f_sent, k):
         pass
 
     def get_loglikelihood(self):

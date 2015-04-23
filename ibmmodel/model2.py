@@ -1,65 +1,206 @@
-__author__ = 'finde'
+from ibmmodel import *
 
-from model1 import IBMModel1
 
-class IBMModel2:
+class IBMModel2(IBMModel):
+    def __init__(self, source_corpus, target_corpus, verbose=False, t_init='uniform', q_init='uniform'):
+        self.source_corpus = source_corpus
+        self.target_corpus = target_corpus
 
-    def __init__(self):
-        pass
+        self.verbose = verbose
+        e_word = list(set(reduce(operator.add, target_corpus)))
 
-    def train(self, sentences_pair):
-        """
-        input: set of sentence pairs (e,f)
-        output: probability distributions of t (lexical translation) and a (alignment)
-        pseudocode:
-            carry over t(e|f) from Model 1
-            initialize a(i|j,le,lf) = 1/(lf+1) for all i,j,le,lf
-            while not converged do:
-                // initialize
-                count(e|f)=0 for all e,f
-                total(f)=0 for all f
-                counta(i|j,le,lf)=0 for all i,j,le,lf
-                totala(j,le,lf)=0 for all j,le,lf
+        # init t prob
+        # t(f|e) = t[e][f]
+        self.t = defaultdict(dd)
+        if t_init == 'uniform':
+            print "Init T-table: uniform"
+            for f_sent, e_sent in zip(self.source_corpus, self.target_corpus):
+                for f_i in f_sent:
+                    for e_j in [None] + e_sent:
+                        self.t[e_j][f_i] = 1.0 / len(e_word)
 
-                for all sentence pairs (e,f) do
-                    le = length(e), lf = length(f)
+        elif t_init == 'random':
+            print "Init T-table: random"
+            for f_sent, e_sent in zip(self.source_corpus, self.target_corpus):
+                for f_i in f_sent:
+                    for e_j in [None] + e_sent:
+                        self.t[e_j][f_i] = random.random() * -1 + 1
+        else:
+            print "Init T-table using: preset data"
+            self.t = t_init
 
-                    // compute normalization 12:
-                    for j =1.. le do // all word positions in e
-                        s-total(ej)=0
+        # init q
+        # q(j|i,l,m) = q[(i,l,m)][j]
+        self.q = defaultdict(dd)
+        if t_init == 'uniform':
+            print "Init T-table: uniform"
+            for f_sent, e_sent in zip(self.source_corpus, self.target_corpus):
+                l = len(e_sent)
+                m = len(f_sent)
 
-                        for i =0.. lf do // all word positions in f
-                            s-total(ej)+=t(ej|fi) ∗ a(i|j,le,lf)
-                        end for
+                for i, f_i in enumerate(f_sent):
+                    for j, e_j in enumerate([None] + e_sent):
+                        self.q[(i, l, m)][j] = 1.0 / len(e_word)
 
-                    end for
+        elif t_init == 'random':
+            print "Init T-table: random"
+            for f_sent, e_sent in zip(self.source_corpus, self.target_corpus):
+                l = len(e_sent)
+                m = len(f_sent)
 
-                    // collect counts
-                    for j =1.. le do // all word positions in e
+                for i, f_i in enumerate(f_sent):
+                    for j, e_j in enumerate([None] + e_sent):
+                        self.q[(i, l, m)][j] = random.random() * -1 + 1
+        else:
+            print "Init T-table using: preset data"
+            self.t = t_init
 
-                        for i =0.. lf do // all word positions in f
-                            c = t(ej|fi) ∗ a(i|j,le,lf) / s-total(ej)
-                            count(ej|fi)+= c
-                            total(fi)+= c
-                            counta(i|j,le,lf)+= c
-                            totala(j,le,lf)+= c
-                        end for
+    def get_sent_loglikelihood(self, e_sent, f_sent):
+        l = len(e_sent)
+        m = len(f_sent)
+        ll = -(l * np.log(m + 1))  # normalizing constant
 
-                    end for
+        for i, f_i in enumerate(f_sent):
+            t_ef = 0
+            for j, e_j in enumerate([None] + e_sent):
+                t_ef += self.t[e_j][f_i] * self.q[(i, l, m)][j]
+            ll += np.log(t_ef)
 
-                end for
+        return ll
 
-                // estimate probabilities
-                t(e|f)=0 for all e,f
-                a(i|j,le,lf)=0 for all i,j,le,lf
+    def get_sent_alignment(self, e_sent, f_sent, k):
+        l = len(e_sent)
+        m = len(f_sent)
+        sure = []
+        proba = []
+        for i, f_i in enumerate(f_sent):
+            probs = [self.t[e_j][f_i] * self.q[(i, l, m)][j] for j, e_j in enumerate([None] + e_sent)]
+            j = np.argmax(np.array(probs))
 
-                for all e,f do
-                    t(e|f) = count(e|f) / total(f)
-                end for
+            # print probs
+            # print k, i, j
+            if j != 0:
+                if probs[j] > .75:
+                    sure.append(" ".join(['%04d' % (k + 1), str(i + 1), str(j), 'S']))
+                else:
+                    proba.append(" ".join(['%04d' % (k + 1), str(i + 1), str(j), 'P']))
 
-                for all i,j,le,lf do
-                    a(i|j,le,lf) = counta(i|j,le,lf) / totala(j,le,lf)
-                end for
-            end while
-        """
+        return sure, proba
 
+    def train(self, max_iter=np.inf, eps=1E-2, log_file='ibm_model_2', test_set=None):
+        it = 0
+        delta_ll = np.inf
+        ll = -np.inf
+
+        # remove old log
+        if log_file:
+            clean_log(log_file + "_perp")
+            clean_log(log_file + "_ll")
+
+        _init_time = time.time()
+        # loop until converged or until reach maximum iteration
+        while it < max_iter and delta_ll > eps:
+            it += 1
+            start = time.time()
+            print "---Iteration: %s---" % it
+
+            # set all counts to zero
+            c_ef = Counter()
+            c_e = Counter()
+            c_jilm = Counter()
+            c_ilm = Counter()
+            for f_sent, e_sent in zip(self.source_corpus, self.target_corpus):
+                l = len(e_sent)
+                m = len(f_sent)
+                for i, f_i in enumerate(f_sent):
+                    sum_t = sum([self.t[e_j][f_i] for e_j in [None] + e_sent]) * 1.0
+                    for j, e_j in enumerate([None] + e_sent):
+                        delta = self.t[e_j][f_i] / sum_t
+                        c_ef[(e_j, f_i)] += delta
+                        c_e[e_j] += delta
+                        c_jilm[(j, i, l, m)] += delta
+                        c_ilm[(i, l, m)] += delta
+
+            # update t
+            for (e, f), c in c_ef.items():
+                self.t[e][f] = c / c_e[e]
+
+            # update q
+            for (j, i, l, m), c in c_jilm.items():
+                self.q[(i, l, m)][j] = c / c_ilm[(i, l, m)]
+
+            old_ll = ll
+            ll = self.get_loglikelihood()
+            perp = self.get_perplexity()
+
+            # save into log
+            if log_file:
+                write_to_log(log_file + "_ll", ll)
+                write_to_log(log_file + "_perp", perp)
+
+            print "   LogLikelihood: %s" % ll
+            print "   Perplexity: %s" % perp
+            print "   Iteration time: %s" % str(time.time() - start)
+            print "   Elapsed time: %s" % str(time.time() - _init_time)
+            print ""
+            delta_ll = ll - old_ll
+
+            if it % 10 == 0:
+                self.dump('cache/ibm_model_2_ef_%s.%s' % (self.t_init, str(it)))
+                if test_set is not None:
+                    self.get_alignments(sentences_pair=test_set,
+                                        log_file='results/ibm_model_2_ef_%s_align.%s' % (self.t_init, str(it)))
+
+                plot_likelihood('Log-Likelihood IBM Model 2 (%s)' % t_init,
+                                'results/' + log_file + "_ll.txt",
+                                'ibm_model_2_ef_%s' % t_init)
+
+        return self.t
+
+
+if __name__ == '__main__':
+
+    if len(sys.argv) > 1:
+        train_source = sys.argv[1]
+    else:
+        train_source = 'data/hansards.36.2.e'
+
+    if len(sys.argv) > 2:
+        train_target = sys.argv[2]
+    else:
+        train_target = 'data/hansards.36.2.f'
+
+    if len(sys.argv) > 3:
+        test_source = sys.argv[3]
+    else:
+        test_source = 'data/test.e'
+
+    if len(sys.argv) > 4:
+        test_target = sys.argv[4]
+    else:
+        test_target = 'data/test.f'
+
+    if len(sys.argv) > 5:
+        t_init = sys.argv[5]
+    else:
+        t_init = 'random'
+
+    if len(sys.argv) > 6:
+        max_lines = int(sys.argv[6])
+    else:
+        max_lines = np.inf
+
+    s, t = get_sentences_pair(train_source, train_target, max_lines=max_lines)
+    _s, _t = get_sentences_pair(test_source, test_target)
+
+    model = IBMModel2(source_corpus=s+_s, target_corpus=t+_t, t_init=t_init)
+    model.train(test_set=zip(_s, _t), log_file='ibm_model_2_%s' % t_init)
+
+    plot_likelihood('Log-Likelihood IBM Model 2 (%s)' % t_init,
+                    'results/ibm_model_2_%s_ll.txt' % t_init,
+                    'ibm_model_2_ef_%s' % t_init)
+
+    model.dump('cache/ibm_model_2_ef_%s' % t_init)
+
+    model.get_alignments(sentences_pair=zip(_s, _t), log_file='results/ibm_model_2_ef_%s_align' % t_init)
+    # print T

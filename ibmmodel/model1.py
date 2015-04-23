@@ -3,15 +3,14 @@ from ibmmodel import *
 
 class IBMModel1(IBMModel):
     def __init__(self, source_corpus, target_corpus, verbose=False, t_init='uniform'):
-        self.t = defaultdict()
-        self.q = defaultdict()
-
         self.source_corpus = source_corpus
         self.target_corpus = target_corpus
 
+        self.t_init = t_init
         self.verbose = verbose
 
         # init t prob
+        # t(f|e) = t[e][f]
         self.t = defaultdict(dd)
         e_word = list(set(reduce(operator.add, target_corpus)))
         if t_init == 'uniform':
@@ -54,10 +53,10 @@ class IBMModel1(IBMModel):
             # print probs
             # print k, i, j
             if j != 0:
-                if probs[j] > .5:
-                    sure.append(" ".join([str(k + 1), str(i + 1), str(j), 'S']))
+                if probs[j] > .75:
+                    sure.append(" ".join(['%04d' % (k + 1), str(i + 1), str(j), 'S']))
                 else:
-                    proba.append(" ".join([str(k + 1), str(i + 1), str(j), 'P']))
+                    proba.append(" ".join(['%04d' % (k + 1), str(i + 1), str(j), 'P']))
 
         return sure, proba
 
@@ -104,15 +103,20 @@ class IBMModel1(IBMModel):
 
             print "   LogLikelihood: %s" % ll
             print "   Perplexity: %s" % perp
-            print "   Iteration time: %s" % str(time.time()-start)
-            print "   Elapsed time: %s" % str(time.time()-_init_time)
+            print "   Iteration time: %s" % str(time.time() - start)
+            print "   Elapsed time: %s" % str(time.time() - _init_time)
             print ""
             delta_ll = ll - old_ll
 
             if it % 10 == 0:
-                self.dump('cache/ibm_model_1_backup_' + str(it))
+                self.dump('cache/ibm_model_1_ef_%s.%s' % (self.t_init, str(it)))
                 if test_set is not None:
-                    self.get_alignments(sentences_pair=test_set, log_file='results/ibm_model_1_ef_align_' + str(it))
+                    self.get_alignments(sentences_pair=test_set,
+                                        log_file='results/ibm_model_1_ef_%s_align.%s' % (self.t_init, str(it)))
+
+                plot_likelihood('Log-Likelihood IBM Model 1 (%s)' % t_init,
+                                'results/' + log_file + "_ll.txt",
+                                'ibm_model_1_ef_%s' % t_init)
 
         return self.t
 
@@ -142,7 +146,7 @@ if __name__ == '__main__':
     if len(sys.argv) > 5:
         t_init = sys.argv[5]
     else:
-        test_target = 'random'
+        t_init = 'random'
 
     if len(sys.argv) > 6:
         max_lines = int(sys.argv[6])
@@ -155,10 +159,13 @@ if __name__ == '__main__':
     _s, _t = get_sentences_pair(test_source, test_target)
 
     model = IBMModel1(source_corpus=s+_s, target_corpus=t+_t, t_init=t_init)
-    model.train(test_set=zip(_s, _t))
+    model.train(test_set=zip(_s, _t), log_file='ibm_model_1_%s' % t_init)
 
-    plot_likelihood('Log-Likelihood IBM Model 1', 'results/ibm_model_1_ll.txt', 'ibm_model_1_ef')
-    model.dump('cache/ibm_model_1_ef')
+    plot_likelihood('Log-Likelihood IBM Model 1 (%s)' % t_init,
+                    'results/ibm_model_1_%s_ll.txt' % t_init,
+                    'ibm_model_1_ef_%s' % t_init)
 
-    model.get_alignments(sentences_pair=zip(_s, _t), log_file='results/ibm_model_1_ef_align')
+    model.dump('cache/ibm_model_1_ef_%s' % t_init)
+
+    model.get_alignments(sentences_pair=zip(_s, _t), log_file='results/ibm_model_1_ef_%s_align' % t_init)
     # print T
