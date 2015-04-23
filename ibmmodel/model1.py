@@ -164,11 +164,11 @@ if __name__ == '__main__':
     print "training..."
     model.train(test_set=zip(_s, _t), log_file='ibm_model_1_%s' % init)
 
-    plot_likelihood('Log-Likelihood IBM Model 1 (%s)' % init,
-                    'results/ibm_model_1_%s_ll.txt' % init,
-                    'ibm_model_1_ef_%s' % init)
-
     model.dump('cache/ibm_model_1_ef_%s' % init)
 
     model.get_alignments(sentences_pair=zip(_s, _t), log_file='results/ibm_model_1_ef_%s_align' % init)
+
+    plot_likelihood('Log-Likelihood IBM Model 1 (%s)' % init,
+                    'results/ibm_model_1_%s_ll.txt' % init,
+                    'ibm_model_1_ef_%s' % init)
     # print T
