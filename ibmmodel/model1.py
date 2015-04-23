@@ -140,7 +140,7 @@ if __name__ == '__main__':
 
     # todo remove the log file / remove the cache file
 
-    s, t = get_sentences_pair(train_source, train_target, max_lines=1000)
+    s, t = get_sentences_pair(train_source, train_target)
     _s, _t = get_sentences_pair(test_source, test_target)
 
     model = IBMModel1(source_corpus=s+_s, target_corpus=t+_t)
