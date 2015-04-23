@@ -164,7 +164,7 @@ class IBMModel1Moore(IBMModel):
 
         return sure, proba
 
-    def train(self, max_iter=np.inf, eps=1E-2, log_file='ibm_model_1_moore', test_set=None):
+    def train(self, max_iter=np.inf, eps=1E-1, log_file='ibm_model_1_moore', test_set=None):
         it = 0
         delta_ll = np.inf
         ll = -np.inf
