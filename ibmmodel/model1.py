@@ -51,6 +51,8 @@ class IBMModel1(IBMModel):
             probs = [self.t[e_j][f_i] for j, e_j in enumerate([None] + e_sent)]
             j = np.argmax(np.array(probs))
 
+            # print probs
+            # print k, i, j
             if j != 0:
                 if probs[j] > .5:
                     sure.append(" ".join([str(k + 1), str(i + 1), str(j), 'S']))
@@ -69,9 +71,11 @@ class IBMModel1(IBMModel):
             clean_log(log_file + "_perp")
             clean_log(log_file + "_ll")
 
+        _init_time = time.time()
         # loop until converged or until reach maximum iteration
         while it < max_iter and delta_ll > eps:
             it += 1
+            start = time.time()
             print "---Iteration: %s---" % it
 
             # set all counts to zero
@@ -100,6 +104,8 @@ class IBMModel1(IBMModel):
 
             print "   LogLikelihood: %s" % ll
             print "   Perplexity: %s" % perp
+            print "   Iteration time: %s" % str(time.time()-start)
+            print "   Elapsed time: %s" % str(time.time()-_init_time)
             print ""
             delta_ll = ll - old_ll
 
@@ -145,7 +151,7 @@ if __name__ == '__main__':
 
     # todo remove the log file / remove the cache file
 
-    s, t = get_sentences_pair(train_source, train_target)
+    s, t = get_sentences_pair(train_source, train_target, max_lines=max_lines)
     _s, _t = get_sentences_pair(test_source, test_target)
 
     model = IBMModel1(source_corpus=s+_s, target_corpus=t+_t, t_init=t_init)
