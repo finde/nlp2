@@ -124,24 +124,24 @@ if __name__ == '__main__':
         train_target = 'data/hansards.36.2.f'
 
     if len(sys.argv) > 3:
-        max_lines = int(sys.argv[3])
-    else:
-        max_lines = np.inf
-
-    if len(sys.argv) > 4:
-        test_source = sys.argv[4]
+        test_source = sys.argv[3]
     else:
         test_source = 'data/test.e'
 
-    if len(sys.argv) > 5:
-        test_target = sys.argv[5]
+    if len(sys.argv) > 4:
+        test_target = sys.argv[4]
     else:
         test_target = 'data/test.f'
 
-    if len(sys.argv) > 6:
-        t_init = sys.argv[6]
+    if len(sys.argv) > 5:
+        t_init = sys.argv[5]
     else:
         test_target = 'random'
+
+    if len(sys.argv) > 6:
+        max_lines = int(sys.argv[6])
+    else:
+        max_lines = np.inf
 
     # todo remove the log file / remove the cache file
 
