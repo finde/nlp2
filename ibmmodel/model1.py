@@ -138,12 +138,17 @@ if __name__ == '__main__':
     else:
         test_target = 'data/test.f'
 
+    if len(sys.argv) > 6:
+        t_init = sys.argv[6]
+    else:
+        test_target = 'random'
+
     # todo remove the log file / remove the cache file
 
     s, t = get_sentences_pair(train_source, train_target)
     _s, _t = get_sentences_pair(test_source, test_target)
 
-    model = IBMModel1(source_corpus=s+_s, target_corpus=t+_t)
+    model = IBMModel1(source_corpus=s+_s, target_corpus=t+_t, t_init=t_init)
     model.train(test_set=zip(_s, _t))
 
     plot_likelihood('Log-Likelihood IBM Model 1', 'results/ibm_model_1_ll.txt', 'ibm_model_1_ef')
