@@ -1,140 +1,153 @@
-from __future__ import division
-from operator import itemgetter
-import collections
-import cPickle
-import operator
-import numpy as np
+from ibmmodel import *
 
 
-def _pprint(tbl):
-    """
-    print top 10 translation key-pairs
-    :param tbl:
-    :return:
-    """
-    for (e, f), v in sorted(tbl.items(), key=itemgetter(1), reverse=True)[:10]:
-        print "p(%s|%s) = %f" % (e, f, v)
-
-
-class IBMModel1:
-    def __init__(self, source_corpus, target_corpus):
-        self.t = collections.defaultdict()
-        self.q = collections.defaultdict()
+class IBMModel1(IBMModel):
+    def __init__(self, source_corpus, target_corpus, verbose=False, t_init='uniform'):
+        self.t = defaultdict()
+        self.q = defaultdict()
 
         self.source_corpus = source_corpus
         self.target_corpus = target_corpus
-        self.f_word = list(set(reduce(operator.add, source_corpus)))
-        self.e_word = list(set(reduce(operator.add, target_corpus)))
-        pass
 
-    def save_translation_table(self, filename='model1.p'):
-        print self.get_argmax_t()
-        cPickle.dump(self.get_argmax_t(), open(filename, 'w'))
+        self.verbose = verbose
 
-    def load_translation_table(self, filename='model1.p'):
-        return cPickle.load(self.get_argmax_t(), open(filename, 'r'))
+        # init t prob
+        self.t = defaultdict(dd)
+        e_word = list(set(reduce(operator.add, target_corpus)))
+        if t_init == 'uniform':
+            print "Init T-table: uniform"
+            for f_sent, e_sent in zip(self.source_corpus, self.target_corpus):
+                for f_i in f_sent:
+                    for e_j in [None] + e_sent:
+                        self.t[e_j][f_i] = 1.0 / len(e_word)
 
-    def get_viterbi(self, source_sentence, target_sentence):
+        elif t_init == 'random':
+            print "Init T-table: random"
+            for f_sent, e_sent in zip(self.source_corpus, self.target_corpus):
+                for f_i in f_sent:
+                    for e_j in [None] + e_sent:
+                        self.t[e_j][f_i] = random.random() * -1 + 1
+        else:
+            print "Init T-table using: preset data"
+            self.t = t_init
 
-        pass
+    def get_sent_loglikelihood(self, e_sent, f_sent):
+        l_f = len(f_sent)
+        l_e = len(e_sent)
+        ll = -(l_e * np.log(l_f + 1))  # normalizing constant
 
-    def train(self, max_iter=5):
-        f_word = self.f_word
-        e_word = self.e_word
-        t = self.t
-        # q = self.q
-        old_ll = 0
-        eps = 1E-2
+        for f_i in f_sent:
+            t_ef = 0
+            for e_j in ([None] + e_sent):
+                t_ef += self.t[e_j][f_i]
+            ll += np.log(t_ef)
 
-        for k in range(max_iter):
-            C = {}
-            for m, l in zip(self.source_corpus, self.target_corpus):
-                l = ['NULL'] + l
-                if k == 0:
-                    for fi in m:
-                        for ej in l:
-                            if "%s|%s" % (fi, ej) not in t:
-                                t["%s|%s" % (fi, ej)] = 1.0 / len(e_word)
+        return ll
 
-                for i, fi in enumerate(m):
-                    sum_t = sum([t["%s|%s" % (fi, ej)] for ej in l]) * 1.0
-                    for j, ej in enumerate(l):
-                        delta = t["%s|%s" % (fi, ej)] / sum_t
+    def get_sent_alignment(self, e_sent, f_sent, k):
+        sure = []
+        proba = []
+        for i, f_i in enumerate(f_sent):
+            probs = [self.t[e_j][f_i] for j, e_j in enumerate([None] + e_sent)]
+            j = np.argmax(np.array(probs))
 
-                        C["%s %s" % (ej, fi)] = C.get("%s %s" % (ej, fi), 0) + delta
-                        C["%s" % (ej)] = C.get("%s" % (ej), 0) + delta
+            if j != 0:
+                if probs[j] > .5:
+                    sure.append(" ".join([str(k + 1), str(i + 1), str(j), 'S']))
+                else:
+                    proba.append(" ".join([str(k + 1), str(i + 1), str(j), 'P']))
 
-                        # C["%s|%s %s %s" % (j, i, len(m), len(l))] = C.get("%s|%s %s %s" % (j, i, len(m), len(l)), 0) + delta
-                        # C["%s %s %s" % (j, len(m), len(l))] = C.get("%s %s %s" % (j, len(m), len(l)), 0) + delta
+        return sure, proba
 
-            # set t
-            for f in f_word:
-                for e in e_word:
-                    if "%s %s" % (e, f) in C and "%s" % (e) in C:
-                        t["%s|%s" % (f, e)] = C["%s %s" % (e, f)] / C["%s" % (e)]
+    def train(self, max_iter=np.inf, eps=1E-2, log_file='ibm_model_1', test_set=None):
+        it = 0
+        delta_ll = np.inf
+        ll = -np.inf
 
-            ll = 0
-            for m, l in zip(self.source_corpus, self.target_corpus):
-                l = ['NULL'] + l
-                for i, fi in enumerate(m):
-                    _t_ef = 0
+        # remove old log
+        if log_file:
+            clean_log(log_file + "_perp")
+            clean_log(log_file + "_ll")
 
-                    for j, ej in enumerate(l):
-                        # num = C.get("%s|%s %s %s" % (j, i, len(m), len(l)), 0)
-                        # denum = C.get("%s %s %s" % (j, len(m), len(l)), 0)
-                        # q["%s|%s %s %s" % (j, i, len(m), len(l))] = num / denum
+        # loop until converged or until reach maximum iteration
+        while it < max_iter and delta_ll > eps:
+            it += 1
+            print "---Iteration: %s---" % it
 
-                        # likelihood
-                        _t_ef += t["%s|%s" % (fi, ej)]
+            # set all counts to zero
+            c_ef = Counter()
+            c_e = Counter()
+            for f_sent, e_sent in zip(self.source_corpus, self.target_corpus):
+                for f_i in f_sent:
+                    sum_t = sum([self.t[e_j][f_i] for e_j in [None] + e_sent]) * 1.0
+                    for e_j in [None] + e_sent:
+                        delta = self.t[e_j][f_i] / sum_t
+                        c_ef[(e_j, f_i)] += delta
+                        c_e[e_j] += delta
 
-                    ll += np.log(_t_ef)
-
-                ll -= len(l) * np.log(len(m))
-
-            print "---em iteration:%s---: %s" % (k + 1, ll)
-
-            with open('ll_ibm_model_1.txt', 'ab') as f:
-                f.write(str(ll) + '\n')
-                f.close()
-
-            if abs(old_ll - ll) < eps:
-                break
+            # update t
+            for (e, f), c in c_ef.items():
+                self.t[e][f] = c / c_e[e]
 
             old_ll = ll
+            ll = self.get_loglikelihood()
+            perp = self.get_perplexity()
 
-        self.t = t
-        # self.q = q
+            # save into log
+            if log_file:
+                write_to_log(log_file + "_ll", ll)
+                write_to_log(log_file + "_perp", perp)
 
-        with open('t_ibm_model_1', 'w') as f:
-            cPickle.dump({'t': self.t, 'it': k, 'll': ll}, f)
-            f.close()
+            print "   LogLikelihood: %s" % ll
+            print "   Perplexity: %s" % perp
+            print ""
+            delta_ll = ll - old_ll
+
+            if it % 10 == 0:
+                self.dump('cache/ibm_model_1_backup_' + str(it))
+                if test_set is not None:
+                    self.get_alignments(sentences_pair=test_set, log_file='results/ibm_model_1_ef_align_' + str(it))
+
+        return self.t
 
 
 if __name__ == '__main__':
-    source = '../data/hansards.36.2.e'
-    target = '../data/hansards.36.2.f'
-    # source = '../data/corpus_1000.nl'
-    # target = '../data/corpus_1000.en'
 
-    source_sentences = []
-    target_sentences = []
-    max_lines = None
-    with open(source) as file_f, open(target) as file_e:
-        for _f, _e in zip(file_f, file_e):
-            source_sentences.append(_f.rstrip('\n').split(' '))
-            target_sentences.append(_e.rstrip('\n').split(' '))
+    if len(sys.argv) > 1:
+        train_source = sys.argv[1]
+    else:
+        train_source = 'data/hansards.36.2.e'
 
-            if len(source_sentences) % 1000 == 0:
-                print "Read: %s lines" % (len(source_sentences))
+    if len(sys.argv) > 2:
+        train_target = sys.argv[2]
+    else:
+        train_target = 'data/hansards.36.2.f'
 
-            if max_lines:
-                if len(source_sentences) == max_lines:
-                    break
+    if len(sys.argv) > 3:
+        max_lines = int(sys.argv[3])
+    else:
+        max_lines = np.inf
 
-    with open('ll_ibm_model_1.txt', 'w') as f:
-        f.close()
+    if len(sys.argv) > 4:
+        test_source = sys.argv[4]
+    else:
+        test_source = 'data/test.e'
 
-    ibm = IBMModel1(source_corpus=source_sentences, target_corpus=target_sentences)
-    ibm.train(max_iter=10000)
-    # T = ibm.get_viterbi()
+    if len(sys.argv) > 5:
+        test_target = sys.argv[5]
+    else:
+        test_target = 'data/test.f'
+
+    # todo remove the log file / remove the cache file
+
+    s, t = get_sentences_pair(train_source, train_target, max_lines=1000)
+    _s, _t = get_sentences_pair(test_source, test_target)
+
+    model = IBMModel1(source_corpus=s+_s, target_corpus=t+_t)
+    model.train(test_set=zip(_s, _t))
+
+    plot_likelihood('Log-Likelihood IBM Model 1', 'results/ibm_model_1_ll.txt', 'ibm_model_1_ef')
+    model.dump('cache/ibm_model_1_ef')
+
+    model.get_alignments(sentences_pair=zip(_s, _t), log_file='results/ibm_model_1_ef_align')
     # print T
