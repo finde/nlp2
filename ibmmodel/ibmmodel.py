@@ -36,11 +36,10 @@ def get_sentences_pair(source_file, target_file, max_lines=None):
     return source_sentences, target_sentences
 
 
-def plot_likelihood(title, file_name, save_to):
+def plot_likelihood(file_name, save_to):
     with open(file_name, "r") as f:
         data = [float(x.strip()) for x in f.readlines()]
 
-    plt.title(title)
     plt.plot(data)
     plt.xlabel("iterations")
     plt.ylabel("data log-likelihood")
