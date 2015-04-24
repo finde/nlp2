@@ -40,11 +40,11 @@ if __name__ == '__main__':
     print "init... IBM model 1 = 10 iter"
     model = IBMModel1(source_corpus=s + _s, target_corpus=t + _t, init=init)
     t_prob = model.train(test_set=zip(_s, _t), log_file='ibm_model_1_%s' % init, max_iter=10, eps=1)
-    model.get_alignments(sentences_pair=zip(_s, _t), log_file='results/ibm_model_2_ef_%s_align' % init)
+    model.get_alignments(sentences_pair=zip(_s, _t), log_file='results/ibm_model_2_ef_%s_1_align' % init)
 
     model2 = IBMModel2(source_corpus=s + _s, target_corpus=t + _t, init='ibm1', init_t=t_prob)
     model2.train(test_set=zip(_s, _t), log_file='ibm_model_2_%s' % 'ibm1', eps=1)
-    model2.get_alignments(sentences_pair=zip(_s, _t), log_file='results/ibm_model_2_ef_%s_align' % init)
+    model2.get_alignments(sentences_pair=zip(_s, _t), log_file='results/ibm_model_2_ef_%s_2_align' % init)
 
     # plot_likelihood('results/ibm_model_2_%s_ll.txt' % init,
     # 'ibm_model_2_ef_%s' % init)
