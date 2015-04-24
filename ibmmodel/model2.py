@@ -3,7 +3,7 @@ from ibmmodel import *
 
 # todo load alignment from ibm 1
 class IBMModel2(IBMModel):
-    def __init__(self, source_corpus, target_corpus, verbose=False, init='uniform'):
+    def __init__(self, source_corpus, target_corpus, verbose=False, init='uniform', init_t=''):
         self.source_corpus = source_corpus
         self.target_corpus = target_corpus
 
@@ -39,8 +39,15 @@ class IBMModel2(IBMModel):
 
         else:
             print "Init T-table using: preset data (ibm model 1)"
-            self.t = init
-            self.q = init
+            self.t = init_t
+
+            print "Init Q-table: uniform"
+            for f_sent, e_sent in zip(self.source_corpus, self.target_corpus):
+                l = len(e_sent)
+                m = len(f_sent)
+                for i, f_i in enumerate(f_sent):
+                    for j, e_j in enumerate([None] + e_sent):
+                        self.q[(i, l, m)][j] = 1.0 / len(e_word)
 
 
     def get_sent_loglikelihood(self, e_sent, f_sent):
@@ -139,9 +146,9 @@ class IBMModel2(IBMModel):
                     self.get_alignments(sentences_pair=test_set,
                                         log_file='results/ibm_model_2_ef_%s_align.%s' % (self.init, str(it)))
 
-                plot_likelihood('Log-Likelihood IBM Model 2 (%s)' % init,
-                                'results/' + log_file + "_ll.txt",
-                                'ibm_model_2_ef_%s' % init)
+                    # plot_likelihood('Log-Likelihood IBM Model 2 (%s)' % init,
+                    # 'results/' + log_file + "_ll.txt",
+                    #                 'ibm_model_2_ef_%s' % init)
 
         return self.t
 
@@ -185,12 +192,12 @@ if __name__ == '__main__':
     model = IBMModel2(source_corpus=s + _s, target_corpus=t + _t, init=init)
 
     print "training..."
-    model.train(test_set=zip(_s, _t), log_file='ibm_model_2_%s' % init)
+    model.train(test_set=zip(_s, _t), log_file='ibm_model_2_%s' % init, eps=1)
 
     model.dump('cache/ibm_model_2_ef_%s' % init)
 
     model.get_alignments(sentences_pair=zip(_s, _t), log_file='results/ibm_model_2_ef_%s_align' % init)
 
     # plot_likelihood('results/ibm_model_2_%s_ll.txt' % init,
-    #                 'ibm_model_2_ef_%s' % init)
+    # 'ibm_model_2_ef_%s' % init)
     # print T

@@ -114,9 +114,9 @@ class IBMModel1(IBMModel):
                     self.get_alignments(sentences_pair=test_set,
                                         log_file='results/ibm_model_1_ef_%s_align.%s' % (self.init, str(it)))
 
-                plot_likelihood('Log-Likelihood IBM Model 1 (%s)' % init,
-                                'results/' + log_file + "_ll.txt",
-                                'ibm_model_1_ef_%s' % init)
+                # plot_likelihood('Log-Likelihood IBM Model 1 (%s)' % init,
+                #                 'results/' + log_file + "_ll.txt",
+                #                 'ibm_model_1_ef_%s' % init)
 
         return self.t
 
@@ -162,7 +162,7 @@ if __name__ == '__main__':
     model = IBMModel1(source_corpus=s+_s, target_corpus=t+_t, init=init)
 
     print "training..."
-    model.train(test_set=zip(_s, _t), log_file='ibm_model_1_%s' % init)
+    model.train(test_set=zip(_s, _t), log_file='ibm_model_1_%s' % init, eps=1)
 
     model.dump('cache/ibm_model_1_ef_%s' % init)
 

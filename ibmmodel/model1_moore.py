@@ -131,9 +131,9 @@ class IBMModel1Moore(IBMModel):
                     self.get_alignments(sentences_pair=test_set,
                                         log_file='results/%s_ef_%s_align.%s' % (log_file, self.init, str(it)))
 
-                plot_likelihood('Log-Likelihood IBM Model 1 (%s)' % init,
-                                'results/' + log_file + "_ll.txt",
-                                '%s_ef_%s' % (log_file, init))
+                # plot_likelihood('Log-Likelihood IBM Model 1 (%s)' % init,
+                #                 'results/' + log_file + "_ll.txt",
+                #                 '%s_ef_%s' % (log_file, init))
 
         return self.t
 
