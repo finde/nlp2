@@ -66,8 +66,7 @@ class IBMModel2(IBMModel):
     def get_sent_alignment(self, e_sent, f_sent, k):
         l = len(e_sent)
         m = len(f_sent)
-        sure = []
-        proba = []
+        align = []
         for i, f_i in enumerate(f_sent):
             probs = [self.t[e_j][f_i] * self.q[(i, l, m)][j] for j, e_j in enumerate([None] + e_sent)]
             j = np.argmax(np.array(probs))
@@ -75,12 +74,9 @@ class IBMModel2(IBMModel):
             # print probs
             # print k, i, j
             if j != 0:
-                if probs[j] > .75:
-                    sure.append(" ".join(['%04d' % (k + 1), str(i + 1), str(j)]))
-                else:
-                    proba.append(" ".join(['%04d' % (k + 1), str(i + 1), str(j)]))
+                align.append(" ".join(['%04d' % (k + 1), str(i + 1), str(j)]))
 
-        return sure, proba
+        return align
 
     def train(self, max_iter=np.inf, eps=1E-2, log_file='ibm_model_2', test_set=None):
         it = 0
@@ -196,7 +192,7 @@ if __name__ == '__main__':
 
     model.dump('cache/ibm_model_2_ef_%s' % init)
 
-    model.get_alignments(sentences_pair=zip(_s, _t), log_file='results/ibm_model_2_ef_%s_align' % init)
+    model.get_alignments(sentences_pair=zip(_s, _t), log_file='alignments.out')
 
     # plot_likelihood('results/ibm_model_2_%s_ll.txt' % init,
     # 'ibm_model_2_ef_%s' % init)

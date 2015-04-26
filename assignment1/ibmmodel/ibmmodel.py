@@ -7,6 +7,7 @@ import random
 import operator
 import numpy as np
 import matplotlib
+
 matplotlib.use('Agg')
 
 from matplotlib import pyplot as plt
@@ -98,13 +99,9 @@ class IBMModel(object):
 
         with open(log_file, 'w') as f:
             for k, (f_sent, e_sent) in enumerate(sentences_pair):
-                sure, proba = self.get_sent_alignment(e_sent, f_sent, k)
-
-                for s in sure:
-                    f.write(s + '\n')
-
-                for p in proba:
-                    f.write(p + '\n')
+                align = self.get_sent_alignment(e_sent, f_sent, k)
+                for a in align:
+                    f.write(a + '\n')
 
         f.close()
 

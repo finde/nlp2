@@ -59,21 +59,15 @@ class IBMModel1Moore(IBMModel):
         return ll
 
     def get_sent_alignment(self, e_sent, f_sent, k):
-        sure = []
-        proba = []
+        align = []
         for i, f_i in enumerate(f_sent):
             probs = [self.t[e_j][f_i] for j, e_j in enumerate([None] + e_sent)]
             j = np.argmax(np.array(probs))
 
             if j != 0:
-                if k < 2:
-                    print " ".join(['%04d' % (k + 1), str(i + 1), str(j)])
-                if probs[j] > .75:
-                    sure.append(" ".join(['%04d' % (k + 1), str(i + 1), str(j)]))
-                else:
-                    proba.append(" ".join(['%04d' % (k + 1), str(i + 1), str(j)]))
+                align.append(" ".join(['%04d' % (k + 1), str(i + 1), str(j)]))
 
-        return sure, proba
+        return align
 
     def train(self, max_iter=np.inf, eps=1E-1, log_file='ibm_model_1_moore', test_set=None):
         it = 0
@@ -163,21 +157,27 @@ if __name__ == '__main__':
     if len(sys.argv) > 5:
         init = sys.argv[5]
     else:
-        init = 'uniform_n_5'
+        init = 'uniform'
 
     if len(sys.argv) > 6:
         max_lines = int(sys.argv[6])
     else:
-        max_lines = 25000
+        max_lines = np.inf
 
     if len(sys.argv) > 7:
         smooth_n = float(sys.argv[7])
+    else:
+        smooth_n = 0.01
 
     if len(sys.argv) > 8:
         smooth_v = int(sys.argv[8])
+    else:
+        smooth_V = 0
 
     if len(sys.argv) > 9:
         n_null = int(sys.argv[9])
+    else:
+        n_null = 3
 
 
     # todo remove the log file / remove the cache file
@@ -195,7 +195,7 @@ if __name__ == '__main__':
 
     model.dump('cache/ibm_model_1_moore_ef_%s' % init)
 
-    model.get_alignments(sentences_pair=zip(_s, _t), log_file='results/ibm_model_1_moore_ef_%s_align' % init)
+    model.get_alignments(sentences_pair=zip(_s, _t), log_file='alignments.out')
 
     # plot_likelihood('results/ibm_model_1_moore_%s_ll.txt' % init,
     # 'ibm_model_1_moore_ef_%s' % init)
